@@ -14,67 +14,77 @@ Or run directly without installing:
 npx github:LucaVor/MantisShell <command>
 ```
 
-## Setup
+## Authentication
+
+Every command requires a workspace token. Get it from the CLI button in the Mantis file browser panel.
+
+You can pass it per-command with `-t`:
 
 ```bash
-mantis login
+mantis ssh <token>
+mantis ls -t <token>
 ```
 
-You'll be prompted for your email, API host, and default space ID.
+Or set it as an environment variable:
 
-Config is saved to `~/.mantis/config.json`.
+```bash
+export MANTIS_TOKEN=<token>
+mantis ls
+mantis push ./file.py
+```
 
 ## Commands
 
 ### Terminal session
 
 ```bash
-mantis ssh
+mantis ssh <token>
+mantis ssh <token> -H https://mantis.example.com
 ```
 
-Opens an interactive terminal in your workspace container. Same environment the agent uses. Ctrl+D to exit.
+Opens an interactive terminal in your workspace container. Ctrl+D to exit.
 
 ### List files
 
 ```bash
-mantis ls
-mantis ls subdir/
+mantis ls -t <token>
+mantis ls subdir/ -t <token>
 ```
 
 ### Upload files
 
 ```bash
-mantis push ./script.py
-mantis push ./data/ remote-data/
+mantis push ./script.py -t <token>
+mantis push ./data/ remote-data/ -t <token>
 ```
 
 ### Download files
 
 ```bash
-mantis pull output.png ./
-mantis pull results/data.csv ./local-copy.csv
+mantis pull output.png ./ -t <token>
+mantis pull results/data.csv ./local.csv -t <token>
 ```
 
 ### Run a command
 
 ```bash
-mantis run "python analysis.py"
-mantis run "pip install pandas"
+mantis run "python analysis.py" -t <token>
+mantis run "pip install pandas" -t <token>
 ```
 
 Streams output and exits when done.
 
-### Set default space
+## Options
 
-```bash
-mantis use <space-id>
-```
+All commands accept:
+
+- `-t, --token <token>` : workspace access token (or `MANTIS_TOKEN` env var)
+- `-H, --host <host>` : API host (default: `http://localhost:8000` or `MANTIS_HOST` env var)
 
 ## How it works
 
-MantisShell connects to the Mantis backend over WebSocket (for terminal) and HTTP (for file operations). It uses the same infrastructure as the web UI's built-in terminal and file browser. No SSH, no port forwarding, no tunnels.
+Connects to the Mantis backend over WebSocket (terminal) and HTTP (file ops). Uses the same infrastructure as the web UI. No SSH, no port forwarding, no tunnels.
 
 ## Requirements
 
 - Node.js 18+
-- A running Mantis backend with a provisioned workspace (open the space in the browser first)
