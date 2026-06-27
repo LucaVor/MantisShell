@@ -1,4 +1,3 @@
-import { getConfig } from '../config';
 import { fetchTree } from '../api';
 
 interface FileNode {
@@ -8,20 +7,8 @@ interface FileNode {
     size?: number;
 }
 
-export async function lsCommand(remotePath?: string): Promise<void> {
-    const config = getConfig();
-    if (!config || !config.email) {
-        console.error('Not logged in. Run `mantis login` first.');
-        process.exit(1);
-    }
-
-    const spaceId = config.defaultSpaceId;
-    if (!spaceId) {
-        console.error('No default space. Run `mantis use <space-id>` first.');
-        process.exit(1);
-    }
-
-    const tree = await fetchTree(config, spaceId, remotePath) as FileNode[];
+export async function lsCommand(remotePath: string | undefined, token: string, host: string): Promise<void> {
+    const tree = await fetchTree(token, host, remotePath) as FileNode[];
 
     if (tree.length === 0) {
         console.log('(empty)');

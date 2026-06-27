@@ -1,23 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { getConfig } from '../config';
 import { downloadFile } from '../api';
 
-export async function pullCommand(remotePath: string, localPath?: string): Promise<void> {
-    const config = getConfig();
-    if (!config || !config.email) {
-        console.error('Not logged in. Run `mantis login` first.');
-        process.exit(1);
-    }
-
-    const spaceId = config.defaultSpaceId;
-    if (!spaceId) {
-        console.error('No default space. Run `mantis use <space-id>` first.');
-        process.exit(1);
-    }
-
+export async function pullCommand(remotePath: string, localPath: string | undefined, token: string, host: string): Promise<void> {
     const dest = localPath || path.basename(remotePath);
-    const content = await downloadFile(config, spaceId, remotePath);
+    const content = await downloadFile(token, host, remotePath);
 
     const resolvedDest = path.resolve(dest);
     const destDir = path.dirname(resolvedDest);
@@ -26,5 +13,5 @@ export async function pullCommand(remotePath: string, localPath?: string): Promi
     }
 
     fs.writeFileSync(resolvedDest, content);
-    console.log(`Pulled workspace:/${remotePath} → ${resolvedDest} (${content.length} bytes)`);
+    console.log(`Pulled ${remotePath} (${content.length} bytes)`);
 }

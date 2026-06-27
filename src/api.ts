@@ -2,21 +2,20 @@ import * as https from 'https';
 import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
-import { MantisConfig } from './config';
 
-function request(config: MantisConfig, method: string, urlPath: string, body?: Buffer | string): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: Buffer }> {
+function request(host: string, method: string, urlPath: string, token: string, body?: Buffer): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: Buffer }> {
     return new Promise((resolve, reject) => {
-        const url = new URL(urlPath, config.apiHost);
+        const url = new URL(urlPath, host);
         const isHttps = url.protocol === 'https:';
         const mod = isHttps ? https : http;
 
         const headers: Record<string, string> = {
-            'X-User-Email': config.email,
+            'X-Mantis-Token': token,
         };
 
-        if (body && typeof body === 'string') {
+        if (body && !urlPath.includes('upload')) {
             headers['Content-Type'] = 'application/json';
-            headers['Content-Length'] = Buffer.byteLength(body).toString();
+            headers['Content-Length'] = body.length.toString();
         }
 
         const options: http.RequestOptions = {
@@ -45,26 +44,29 @@ function request(config: MantisConfig, method: string, urlPath: string, body?: B
     });
 }
 
-export async function fetchTree(config: MantisConfig, spaceId: string, dirPath?: string): Promise<unknown[]> {
+export async function fetchTree(token: string, host: string, dirPath?: string): Promise<unknown[]> {
     const ts = Date.now();
     const url = dirPath
-        ? `/api/filesystem/${spaceId}/tree/${dirPath}?user_email=${encodeURIComponent(config.email)}&_t=${ts}`
-        : `/api/filesystem/${spaceId}/tree/?user_email=${encodeURIComponent(config.email)}&_t=${ts}`;
-    const res = await request(config, 'GET', url);
+        ? `/api/filesystem/00000000-0000-0000-0000-000000000000/tree/${dirPath}?token=${token}&_t=${ts}`
+        : `/api/filesystem/00000000-0000-0000-0000-000000000000/tree/?token=${token}&_t=${ts}`;
+    const res = await request(host, 'GET', url, token);
+    if (res.status >= 400) {
+        throw new Error(`List failed (${res.status}): ${res.body.toString().slice(0, 100)}`);
+    }
     return JSON.parse(res.body.toString());
 }
 
-export async function downloadFile(config: MantisConfig, spaceId: string, remotePath: string): Promise<Buffer> {
-    const url = `/api/filesystem/${spaceId}/download/${remotePath}/?user_email=${encodeURIComponent(config.email)}`;
-    const res = await request(config, 'GET', url);
-    if (res.status !== 200) {
-        throw new Error(`Download failed (${res.status}): ${res.body.toString().slice(0, 200)}`);
+export async function downloadFile(token: string, host: string, remotePath: string): Promise<Buffer> {
+    const url = `/api/filesystem/00000000-0000-0000-0000-000000000000/download/${remotePath}/?token=${token}`;
+    const res = await request(host, 'GET', url, token);
+    if (res.status >= 400) {
+        throw new Error(`Download failed (${res.status}): ${res.body.toString().slice(0, 100)}`);
     }
     return res.body;
 }
 
-export async function uploadFile(config: MantisConfig, spaceId: string, localPath: string, remotePath: string): Promise<void> {
-    const url = new URL(`/api/filesystem/${spaceId}/upload/?user_email=${encodeURIComponent(config.email)}`, config.apiHost);
+export async function uploadFile(token: string, host: string, localPath: string, remotePath: string): Promise<void> {
+    const url = new URL(`/api/filesystem/00000000-0000-0000-0000-000000000000/upload/?token=${token}`, host);
     const isHttps = url.protocol === 'https:';
     const mod = isHttps ? https : http;
 
@@ -73,11 +75,9 @@ export async function uploadFile(config: MantisConfig, spaceId: string, localPat
     const boundary = '----MantisUpload' + Date.now();
 
     const parts: Buffer[] = [];
-    // File field
     parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n`));
     parts.push(fileContent);
     parts.push(Buffer.from('\r\n'));
-    // Path field
     parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="path"\r\n\r\n${remotePath}\r\n`));
     parts.push(Buffer.from(`--${boundary}--\r\n`));
 
@@ -92,14 +92,14 @@ export async function uploadFile(config: MantisConfig, spaceId: string, localPat
             headers: {
                 'Content-Type': `multipart/form-data; boundary=${boundary}`,
                 'Content-Length': body.length.toString(),
-                'X-User-Email': config.email,
+                'X-Mantis-Token': token,
             },
         }, (res) => {
             const chunks: Buffer[] = [];
             res.on('data', (c) => chunks.push(c));
             res.on('end', () => {
                 if (res.statusCode && res.statusCode >= 400) {
-                    reject(new Error(`Upload failed (${res.statusCode}): ${Buffer.concat(chunks).toString().slice(0, 200)}`));
+                    reject(new Error(`Upload failed (${res.statusCode}): ${Buffer.concat(chunks).toString().slice(0, 100)}`));
                 } else {
                     resolve();
                 }
