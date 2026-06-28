@@ -4,9 +4,15 @@ export function sshCommand(token: string, host: string): void {
     const wsBase = host.replace(/^http/, 'ws');
     const wsUrl = `${wsBase}/ws/terminal/${token}/`;
 
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(wsUrl, { perMessageDeflate: false });
+
+    let pingInterval: ReturnType<typeof setInterval> | null = null;
 
     ws.on('open', () => {
+        // Keepalive ping every 25s
+        pingInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) ws.ping();
+        }, 25000);
         if (process.stdin.isTTY) {
             process.stdin.setRawMode(true);
         }
@@ -45,6 +51,7 @@ export function sshCommand(token: string, host: string): void {
     });
 
     ws.on('close', (code: number) => {
+        if (pingInterval) clearInterval(pingInterval);
         if (process.stdin.isTTY) {
             process.stdin.setRawMode(false);
         }
@@ -55,6 +62,7 @@ export function sshCommand(token: string, host: string): void {
     });
 
     ws.on('error', (err: Error) => {
+        if (pingInterval) clearInterval(pingInterval);
         if (process.stdin.isTTY) {
             process.stdin.setRawMode(false);
         }
