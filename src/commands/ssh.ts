@@ -4,15 +4,21 @@ export function sshCommand(token: string, host: string): void {
     const wsBase = host.replace(/^http/, 'ws');
     const wsUrl = `${wsBase}/ws/terminal/${token}/`;
 
-    const ws = new WebSocket(wsUrl, { perMessageDeflate: false });
+    const ws = new WebSocket(wsUrl, {
+        perMessageDeflate: false,
+        handshakeTimeout: 10000,
+    });
 
     let pingInterval: ReturnType<typeof setInterval> | null = null;
 
     ws.on('open', () => {
-        // Keepalive ping every 25s
+        // Keepalive: send both protocol ping AND a text heartbeat every 15s
         pingInterval = setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) ws.ping();
-        }, 25000);
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.ping();
+                ws.send(JSON.stringify({ type: 'heartbeat' }));
+            }
+        }, 15000);
         if (process.stdin.isTTY) {
             process.stdin.setRawMode(true);
         }
